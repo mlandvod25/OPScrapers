@@ -1,0 +1,15 @@
+node_modules
+.vercel
+.output
+dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+screenshots
+artifacts
+.grok/preview.log
+.grok/status
+.grok/favicon-*.png
+.grok/favicon-preview.html
