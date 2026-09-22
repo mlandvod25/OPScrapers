@@ -156,7 +156,7 @@ export function Configurator() {
     }
   }
 
-  const groups = ["core", "anime", "indexers", "regional", "offline"] as const;
+  const groups = ["core", "anime", "indexers", "regional", "http", "offline"] as const;
   const liveCount = probes?.filter((p) => p.ok).length ?? null;
 
   return (
