@@ -30,6 +30,12 @@ export const SCRAPER_CATALOG: ScraperInfo[] = [
   { id: "oxtorrent", name: "OxTorrent", group: "regional", languages: ["fr"], kinds: ["movie", "series", "anime"], defaultOn: false, note: "French index" },
   { id: "ilcorsaronero", name: "IlCorsaroNero", group: "regional", languages: ["it"], kinds: ["movie", "series"], defaultOn: false, note: "Italian index" },
   { id: "torrentapi", name: "RARBG", group: "offline", languages: ["en"], kinds: ["movie", "series"], defaultOn: false, note: "RARBG shut down in 2023" },
+  // HTTP / HLS direct stream providers (PlayTorrioHTTP-style)
+  { id: "rivestream", name: "RiveStream", group: "http", languages: ["en"], kinds: ["movie", "series"], defaultOn: true, note: "Rive multi-provider HLS/MP4" },
+  { id: "cinesu", name: "CineSu", group: "http", languages: ["en"], kinds: ["movie", "series"], defaultOn: true, note: "CineSu master HLS" },
+  { id: "vidlink", name: "VidLink", group: "http", languages: ["en"], kinds: ["movie", "series"], defaultOn: true, note: "VidLink multi-CDN" },
+  { id: "a111477", name: "111477", group: "http", languages: ["en"], kinds: ["movie", "series"], defaultOn: true, note: "111477 Stremio-style direct streams" },
+  { id: "vidsrc", name: "VidSrc", group: "http", languages: ["en"], kinds: ["movie", "series"], defaultOn: true, note: "VidSrc direct HLS" },
 ];
 
 export const GROUP_LABEL: Record<ScraperInfo["group"], string> = {
@@ -38,10 +44,11 @@ export const GROUP_LABEL: Record<ScraperInfo["group"], string> = {
   anime: "Anime",
   regional: "Regional",
   offline: "Retired / unstable",
+  http: "HTTP streams",
 };
 
 export const ADDON_NAME = "OpenScrapers";
 export const ADDON_ID = "com.synclerscrapers.openscrapers";
-export const ADDON_VERSION = "1.1.0";
+export const ADDON_VERSION = "1.2.0";
 export const ADDON_DESCRIPTION =
-  "SynclerScrapers OpenScrapers torrent indexers, packaged as a Stremio stream addon for AIOStreams.";
+  "SynclerScrapers OpenScrapers torrent indexers + HTTP streams, packaged as a Stremio stream addon for AIOStreams.";

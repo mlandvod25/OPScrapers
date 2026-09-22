@@ -1,7 +1,7 @@
 import { fetchText } from "./http";
 import { SCRAPER_CATALOG } from "./catalog";
 import { resolveQuery } from "./cinemeta";
-import { toStremioStream } from "./format";
+import { toHttpStremioStream, toStremioStream } from "./format";
 import {
   scrapeAnimeTosho,
   scrapeBitsearch,
@@ -11,10 +11,18 @@ import {
   scrapePirateBay,
   scrapeYts,
 } from "./scrapers/dedicated";
+import {
+  scrapeA111477,
+  scrapeCineSu,
+  scrapeRiveStream,
+  scrapeVidLink,
+  scrapeVidSrc,
+} from "./scrapers/http";
 import { scrapeVendorGeneric } from "./scrapers/generic";
 import { detectQuality, episodeMatches, titleMatches } from "./parse";
 import type {
   AddonConfig,
+  HttpHit,
   MediaQuery,
   ScraperStat,
   StremioStream,
@@ -32,6 +40,15 @@ const DEDICATED: Record<string, (q: MediaQuery) => Promise<TorrentHit[]>> = {
   limetorrents: scrapeLimeTorrents,
 };
 
+const HTTP_DEDICATED: Record<string, (q: MediaQuery) => Promise<HttpHit[]>> = {
+  rivestream: scrapeRiveStream,
+  cinesu: scrapeCineSu,
+  vidlink: scrapeVidLink,
+  a111477: scrapeA111477,
+  vidsrc: scrapeVidSrc,
+};
+
+const HTTP_IDS = new Set(Object.keys(HTTP_DEDICATED));
 const SKIP_IDS = new Set(["torrentapi"]);
 const SEARCH_BUDGET_MS = 9000;
 const SCRAPER_TIMEOUT_MS = 5000;
@@ -57,7 +74,8 @@ export async function searchStreams(
   const runners = SCRAPER_CATALOG.filter((s) => enabled.has(s.id) && !SKIP_IDS.has(s.id));
   const deadline = Date.now() + SEARCH_BUDGET_MS;
   const stats: ScraperStat[] = [];
-  const batches: TorrentHit[][] = [];
+  const torrentBatches: TorrentHit[][] = [];
+  const httpBatches: HttpHit[][] = [];
 
   await mapPool(runners, CONCURRENCY, async (info) => {
     const remaining = deadline - Date.now();
@@ -67,16 +85,29 @@ export async function searchStreams(
     }
     const started = Date.now();
     try {
-      const fn = DEDICATED[info.id] ?? ((q: MediaQuery) => scrapeVendorGeneric(info.id, q));
-      const hits = await withTimeout(fn(query), Math.min(SCRAPER_TIMEOUT_MS, remaining));
-      stats.push({
-        id: info.id,
-        name: info.name,
-        ok: true,
-        count: hits.length,
-        ms: Date.now() - started,
-      });
-      batches.push(hits);
+      if (HTTP_IDS.has(info.id)) {
+        const fn = HTTP_DEDICATED[info.id]!;
+        const hits = await withTimeout(fn(query), Math.min(SCRAPER_TIMEOUT_MS, remaining));
+        stats.push({
+          id: info.id,
+          name: info.name,
+          ok: true,
+          count: hits.length,
+          ms: Date.now() - started,
+        });
+        httpBatches.push(hits);
+      } else {
+        const fn = DEDICATED[info.id] ?? ((q: MediaQuery) => scrapeVendorGeneric(info.id, q));
+        const hits = await withTimeout(fn(query), Math.min(SCRAPER_TIMEOUT_MS, remaining));
+        stats.push({
+          id: info.id,
+          name: info.name,
+          ok: true,
+          count: hits.length,
+          ms: Date.now() - started,
+        });
+        torrentBatches.push(hits);
+      }
     } catch (err) {
       stats.push({
         id: info.id,
@@ -89,9 +120,10 @@ export async function searchStreams(
     }
   });
 
+  // ── Torrent merge ──────────────────────────────────────────
   const merged: TorrentHit[] = [];
   const seen = new Set<string>();
-  for (const hits of batches) {
+  for (const hits of torrentBatches) {
     for (const hit of hits) {
       if (!hit.infoHash || seen.has(hit.infoHash)) continue;
       if (hit.seeders < config.minSeeders) continue;
@@ -120,10 +152,29 @@ export async function searchStreams(
 
   merged.sort((a, b) => b.seeders - a.seeders || b.sizeBytes - a.sizeBytes);
   const limited = merged.slice(0, config.maxResults);
+
+  // ── HTTP merge ─────────────────────────────────────────────
+  const httpMerged: HttpHit[] = [];
+  const seenUrls = new Set<string>();
+  for (const hits of httpBatches) {
+    for (const hit of hits) {
+      if (!hit.url || seenUrls.has(hit.url)) continue;
+      if (config.qualities.length && hit.quality && !config.qualities.includes(hit.quality)) {
+        // Keep "Auto" streams even when quality filter is set
+        if (hit.quality !== "Auto") continue;
+      }
+      seenUrls.add(hit.url);
+      httpMerged.push(hit);
+    }
+  }
+
   stats.sort((a, b) => a.name.localeCompare(b.name));
   return {
     query,
-    streams: limited.map(toStremioStream),
+    streams: [
+      ...limited.map(toStremioStream),
+      ...httpMerged.map(toHttpStremioStream),
+    ],
     stats,
   };
 }
@@ -171,6 +222,7 @@ export async function healthCheck(): Promise<
     { id: "nyaa", name: "Nyaa", url: "https://nyaa.si/?page=rss&q=Frieren&c=1_2&f=0" },
     { id: "AnimeTosho", name: "AnimeTosho", url: "https://feed.animetosho.org/json?only_tor=1&q=Frieren" },
     { id: "bitsearch", name: "BitSearch", url: "https://bitsearch.eu/search?q=Frieren" },
+    { id: "rivestream", name: "RiveStream", url: "https://scrapper.rivestream.app/api/providers" },
   ];
   return Promise.all(
     probes.map(async (p) => {

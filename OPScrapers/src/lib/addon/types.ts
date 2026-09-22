@@ -1,6 +1,6 @@
 export type MediaKind = "movie" | "series" | "anime";
 
-export type ScraperGroup = "core" | "indexers" | "anime" | "regional" | "offline";
+export type ScraperGroup = "core" | "indexers" | "anime" | "regional" | "offline" | "http";
 
 export interface AddonConfig {
   scrapers: string[];
@@ -31,6 +31,15 @@ export interface TorrentHit {
   quality?: string;
 }
 
+export interface HttpHit {
+  scraperId: string;
+  scraperName: string;
+  title: string;
+  url: string;
+  quality?: string;
+  headers?: Record<string, string>;
+}
+
 export interface ScraperStat {
   id: string;
   name: string;
@@ -54,12 +63,17 @@ export interface StremioStream {
   name: string;
   title: string;
   description: string;
-  infoHash: string;
+  infoHash?: string;
+  url?: string;
   sources?: string[];
   behaviorHints?: {
     bingeGroup?: string;
     filename?: string;
     videoSize?: number;
+    notWebReady?: boolean;
+    proxyHeaders?: {
+      request?: Record<string, string>;
+    };
   };
 }
 
